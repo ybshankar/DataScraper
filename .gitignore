@@ -1,0 +1,4 @@
+/pytesser/*.pyc
+*.pyc
+/pytesser_old/
+/pytesser_old/*
