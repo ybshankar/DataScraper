@@ -18,8 +18,9 @@ def trimBorders(image):
 def parseSolutionImage(solutionImage):
     solutionString = ''
     processedImage = trimBorders(solutionImage)
+    numCells = 15
     x,y = processedImage.size
-    squareSize = int(5*x/15)
+    cellSize = int(5*x/numCells)
     processedImage = processedImage.resize((int(x*5), int(y*5)), Image.BICUBIC)
     #processedImage = ImageEnhance.Contrast(processedImage)
     processedImage = processedImage.convert("RGBA")
@@ -27,10 +28,10 @@ def parseSolutionImage(solutionImage):
     
     for y in xrange(processedImage.size[1]):
         for x in xrange(processedImage.size[0]):
-            borderPixel = ((x % squareSize) < 15) or \
-                          ((x % squareSize) > (squareSize - 15)) or \
-                          ((y % squareSize) < 15) or \
-                          ((y % squareSize) > (squareSize - 15))
+            borderPixel = ((x % cellSize) < 15) or \
+                          ((x % cellSize) > (cellSize - 15)) or \
+                          ((y % cellSize) < 15) or \
+                          ((y % cellSize) > (cellSize - 15))
             if borderPixel:
                 pix[x, y] = (255, 255, 255, 255)
             elif pix[x, y] <=  (30, 30, 30, 255):
@@ -38,39 +39,59 @@ def parseSolutionImage(solutionImage):
             else:
                 pix[x, y] = (255, 255, 255, 255)
     
+    hashImage = Image.open("hash.png")
+    hashImage = hashImage.resize((cellSize, cellSize), Image.NEAREST)
+    
+    for cellY in xrange(numCells):
+        for cellX in xrange(numCells):
+            startX = int(cellX*cellSize)
+            startY = int(cellY*cellSize)
+            box = (startX, startY , startX + cellSize, startY+cellSize)
+            cellImage = processedImage.crop(box)
+            #cellImage.show("")
+            colors = cellImage.getcolors()
+              
+            if len(colors) == 1:
+                processedImage.paste(hashImage, box)
+
+
+
+    #processedImage.show("30% more contrast")
     #processedImage = processedImage.convert()
     processedImage = processedImage.convert('L')
     processedImage = processedImage.resize((x, y), Image.NEAREST)
     
-    filteredImage = filterAndReturnImage(processedImage, minFilter=9, maxFilter=0, blur=True)
-    filteredImage.show("30% more contrast")
-    solutionString = "Filters : minFilter=9, maxFilter=0, blur=True \n\n"
-    solutionString =  solutionString + image_to_string(filteredImage, True) +'\n\n'
-
-    filteredImage = filterAndReturnImage(processedImage, minFilter=9, maxFilter=0, blur=False)
-    filteredImage.show("30% more contrast")
-    solutionString = solutionString +  "Filters : minFilter=9, maxFilter=0, blur=False \n\n"
-    solutionString =  solutionString + image_to_string(filteredImage, True) +'\n\n'
-    
-    filteredImage = filterAndReturnImage(processedImage, minFilter=7, maxFilter=0, blur=True)
-    filteredImage.show("30% more contrast")
-    solutionString = solutionString + "Filters : minFilter=7, maxFilter=0, blur=True \n\n"
-    solutionString =  solutionString + image_to_string(filteredImage, True) + '\n\n'
-
     filteredImage = filterAndReturnImage(processedImage, minFilter=7, maxFilter=0, blur=False)
-    filteredImage.show("30% more contrast")
-    solutionString = solutionString + "Filters : minFilter=7, maxFilter=0, blur=False \n\n"
-    solutionString =  solutionString + image_to_string(filteredImage, True) + '\n\n'
-    
-    filteredImage = filterAndReturnImage(processedImage, minFilter=11, maxFilter=0, blur=True)
-    filteredImage.show("30% more contrast")
-    solutionString = solutionString + "Filters : minFilter=11, maxFilter=0, blur=True \n\n"
-    solutionString =  solutionString + image_to_string(filteredImage, True) + '\n\n'
-    
-    filteredImage = filterAndReturnImage(processedImage, minFilter=11, maxFilter=0, blur=False)
-    filteredImage.show("30% more contrast")
-    solutionString = solutionString + "Filters : minFilter=11, maxFilter=0, blur=False \n\n"
-    solutionString =  solutionString + image_to_string(filteredImage, True) + '\n\n'
+#     filteredImage.show("30% more contrast")
+#     filteredImage.save("test.bmp")
+#     solutionString = "Filters : minFilter=9, maxFilter=0, blur=True \n\n"
+#     solutionString =  solutionString + image_to_string(filteredImage, True) +'\n\n'
+    solutionString = image_to_string(filteredImage, True)
+
+#     filteredImage = filterAndReturnImage(processedImage, minFilter=9, maxFilter=0, blur=False)
+#     filteredImage.show("30% more contrast")
+#     solutionString = solutionString +  "Filters : minFilter=9, maxFilter=0, blur=False \n\n"
+#     solutionString =  solutionString + image_to_string(filteredImage, True) +'\n\n'
+#     
+#     filteredImage = filterAndReturnImage(processedImage, minFilter=7, maxFilter=0, blur=True)
+#     filteredImage.show("30% more contrast")
+#     solutionString = solutionString + "Filters : minFilter=7, maxFilter=0, blur=True \n\n"
+#     solutionString =  solutionString + image_to_string(filteredImage, True) + '\n\n'
+# 
+#     filteredImage = filterAndReturnImage(processedImage, minFilter=7, maxFilter=0, blur=False)
+#     filteredImage.show("30% more contrast")
+#     solutionString = solutionString + "Filters : minFilter=7, maxFilter=0, blur=False \n\n"
+#     solutionString =  solutionString + image_to_string(filteredImage, True) + '\n\n'
+#     
+#     filteredImage = filterAndReturnImage(processedImage, minFilter=11, maxFilter=0, blur=True)
+#     filteredImage.show("30% more contrast")
+#     solutionString = solutionString + "Filters : minFilter=11, maxFilter=0, blur=True \n\n"
+#     solutionString =  solutionString + image_to_string(filteredImage, True) + '\n\n'
+#     
+#     filteredImage = filterAndReturnImage(processedImage, minFilter=11, maxFilter=0, blur=False)
+#     filteredImage.show("30% more contrast")
+#     solutionString = solutionString + "Filters : minFilter=11, maxFilter=0, blur=False \n\n"
+#     solutionString =  solutionString + image_to_string(filteredImage, True) + '\n\n'
 
     return solutionString
 
@@ -133,7 +154,7 @@ def parsePuzzleImage(puzzleImage):
                     break
 
             if dominantColor[1] == 0:
-                cellColor = 'X'
+                cellColor = '#'
             elif dominantColor[1] == 255:
                 cellColor = '_'
 
@@ -142,101 +163,102 @@ def parsePuzzleImage(puzzleImage):
     return puzzleString
 
 def displayPuzzleString(puzzleStr):
-    displayPuzzleStr = puzzleStr.replace('X', ' X ')
+    displayPuzzleStr = puzzleStr.replace('#', ' # ')
     displayPuzzleStr = displayPuzzleStr.replace('_', ' __')
     return displayPuzzleStr
 
 
-def enhancedPuzzleString(puzzleStr):
+def enhancedPuzzleString(puzzleStr, solutionString=None):
     
     puzzleGrid = puzzleStr.split('\n')
     puzzleGrid = [x for x in puzzleGrid if x not in ['\n', '']]
+    
+
+    if solutionString is None:
+        solutionString = "\n".join(["".join(["_" for x in xrange(len(puzzleGrid[0]))]) for y in xrange(len(puzzleGrid))])
+        
+    puzzleGrid.insert(0, "".join(['#' for x in xrange(len(puzzleGrid))]))
+    puzzleGrid.append( "".join(['#' for x in xrange(len(puzzleGrid))]))
+    puzzleGrid = ["#" + x +"#" for x in puzzleGrid]
+    
+    solutionGrid = solutionString.split('\n')
+    solutionGrid = [x for x in solutionGrid if x not in ['\n', '']]
+    solutionGrid.insert(0, "".join(['#' for x in xrange(len(solutionGrid))]))
+    solutionGrid.append( "".join(['#' for x in xrange(len(solutionGrid))]))
+    solutionGrid = ["#" + x +"#" for x in solutionGrid]
+
+
     enhPuzzleGrid = ["" for x in xrange(len(puzzleGrid))]
     clueCount = 1
     for i in xrange(len(puzzleGrid)):
         for j in xrange(len(puzzleGrid[0])):
-            if puzzleGrid[i][j] == "X":
-                enhPuzzleGrid[i] = enhPuzzleGrid[i] + " X "
+            if puzzleGrid[i][j] == "#":
+                enhPuzzleGrid[i] = enhPuzzleGrid[i] + " ## "
             else:
-                neighbours = {'North' : False, 
-                              'South' : False, 
-                              'East' : False,
-                              'West' : False}
+                neighbours = {'Above' : False, 
+                              'Below' : False, 
+                              'Right' : False,
+                              'Left' : False}
                 
-                if (i == 0): 
-                    neighbours['North'] =  True
-                    if (puzzleGrid[i+1][j] == "X"):
-                        neighbours['South'] = True
-                elif (i==(len(puzzleGrid)-1)): 
-                    neighbours['South'] =  True
-                    if (puzzleGrid[i-1][j] == "X"):
-                        neighbours['North'] = True
-                else:
-                    if (puzzleGrid[i-1][j] == "X"):
-                        neighbours['North'] =  True
-                    if (puzzleGrid[i+1][j] == "X"):
-                        neighbours['South'] =  True
+
+                if (puzzleGrid[i-1][j] == "#"): neighbours['Above'] =  True
+                if (puzzleGrid[i+1][j] == "#"): neighbours['Below'] =  True
+                if (puzzleGrid[i][j+1] == "#"): neighbours['Right'] =  True
+                if (puzzleGrid[i][j-1] == "#"): neighbours['Left'] =  True
                 
-                if (j == 0): 
-                    neighbours['East'] =  True
-                    if (puzzleGrid[i][j+1] == "X"):
-                        neighbours['West'] =  True
-                elif (j==(len(puzzleGrid)-1)): 
-                    neighbours['West'] =  True
-                    if (puzzleGrid[i][j-1] == "X"):
-                        neighbours['East'] =  True
-                else:
-                    if (puzzleGrid[i][j-1] == "X"):
-                        neighbours['East'] =  True
-                    if (puzzleGrid[i][j+1] == "X"):
-                        neighbours['West'] =  True
+                northAndSouthAreSame = (neighbours['Above'] and neighbours['Below']) or \
+                                      ((not neighbours['Above']) and (not neighbours['Below']))
                 
-                northAndSouthAreSame = (neighbours['North'] and neighbours['South']) or \
-                                      ((not neighbours['North']) and (not neighbours['South']))
-                
-                eastAndWestAreSame = (neighbours['East'] and neighbours['West']) or \
-                                      ((not neighbours['East']) and (not neighbours['West']))
+                eastAndWestAreSame = (neighbours['Right'] and neighbours['Left']) or \
+                                      ((not neighbours['Right']) and (not neighbours['Left']))
                                       
                 newClue = False
                 
                 if  northAndSouthAreSame:
-                    if neighbours['East'] and (not neighbours['West']):
+                    if neighbours['Left'] and (not neighbours['Right']):
                         newClue = True
                 elif eastAndWestAreSame:
-                    if neighbours['North'] and (not neighbours['South']):
+                    if neighbours['Above'] and (not neighbours['Below']):
                         newClue = True
                 else:
-                    if not (neighbours['South'] and neighbours['West']):
+                    if not (neighbours['Below'] and neighbours['Right']):
                         newClue=True
                 
                 if newClue:
                     if clueCount <= 9:
-                        enhPuzzleGrid[i] = enhPuzzleGrid[i] + str(clueCount) + "__"
+                        enhPuzzleGrid[i] = enhPuzzleGrid[i] + str(clueCount) + "_" + solutionGrid[i][j] + " "
                     else:
-                        enhPuzzleGrid[i] = enhPuzzleGrid[i] + str(clueCount) + "_"
+                        enhPuzzleGrid[i] = enhPuzzleGrid[i] + str(clueCount) + solutionGrid[i][j] + " "
                     clueCount = clueCount+1
                 else:
-                    enhPuzzleGrid[i] = enhPuzzleGrid[i] + " __"
+                    enhPuzzleGrid[i] = enhPuzzleGrid[i] + " _" + solutionGrid[i][j] + " "
 
+    enhPuzzleGrid = [ x[3:(len(x)-3)] for x in enhPuzzleGrid[1:(len(enhPuzzleGrid)-1)]]
+    
     enhPuzzleGrid = "\n".join(enhPuzzleGrid)
     return enhPuzzleGrid
-
-    
 
 def test_solutionParsing(puzzleNum=10875):
      solution = Image.open("puzzles/solution/"+ str(puzzleNum)+".jpg")
      print parseSolutionImage(solution)
 
+
 def test_puzzleParsing(puzzleNum=10875):
     puzzle = Image.open("puzzles/puzzle/"+ str(puzzleNum)+".jpg")
     puzzleStr = parsePuzzleImage(puzzle)
-    print puzzleStr
-    print displayPuzzleString(puzzleStr)
-    print ""
     print enhancedPuzzleString(puzzleStr)
+    
+def test_parseCompleteCrossword(puzzleNum=10875):
+    puzzle = Image.open("puzzles/puzzle/"+ str(puzzleNum)+".jpg")
+    solution = Image.open("puzzles/solution/"+ str(puzzleNum)+".jpg")
+    solutionStr = parseSolutionImage(solution)
+    puzzleStr = parsePuzzleImage(puzzle)
+    print enhancedPuzzleString(puzzleStr, solutionStr)
 
 if  __name__ =='__main__':
-    test_puzzleParsing()
+#     test_puzzleParsing()
+#     test_solutionParsing()
+    test_parseCompleteCrossword()
 #    puzzleNum = 10875
 #     solution = Image.open("puzzles/solution/"+ str(puzzleNum)+".jpg")
 #     print parseSolutionImage(solution)
