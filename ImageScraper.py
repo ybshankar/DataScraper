@@ -74,6 +74,7 @@ def getCrosswordURL(pageURL, urltype='puzzle', puzzleNum=None):
 
     return xWordURL
 
+
 class ImageScraper(object):
     puzzle = None
     solution = None
@@ -91,7 +92,7 @@ class ImageScraper(object):
         self.puzzleDate = puzzleDate
         self.solutionDate = solutionDate
         self.puzzleURL = self.getPuzzleURL()
-        self.number = self.setPuzzleNumber()
+        self.setPuzzleNumberAndClues()
         self.setSolutionURL()
         
     def getPuzzleURL(self):
@@ -99,14 +100,15 @@ class ImageScraper(object):
         return getCrosswordURL(pageURL, 'puzzle')
 
 
-    def setPuzzleNumber(self):
+    def setPuzzleNumberAndClues(self):
         number = 0
         if self.puzzleURL is not None:
             puzzleHtml = getResponseString(self.puzzleURL)
             numPattern = re.search(r'The\s\s?Hindu\s\s?Crossword.*?[0-9]{2,5}', puzzleHtml)
             if numPattern is not None:
                 number = int(numPattern.group(0).split(' ')[-1])
-        return number
+        self.number = number
+        
         
     def setSolutionURL(self):
         solutionDateUndetermined = (self.puzzleURL is not None) and (self.solutionDate is None)
