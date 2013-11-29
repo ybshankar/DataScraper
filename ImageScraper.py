@@ -74,6 +74,85 @@ def getCrosswordURL(pageURL, urltype='puzzle', puzzleNum=None):
 
     return xWordURL
 
+def getCluesFromHTML(htmlString):
+    puzzleHTML =htmlString.replace('\n', '')
+    puzzleHTML =puzzleHTML.replace('\r', '')
+
+    clues = re.findall(r'<p class="body">.*?</p>', puzzleHTML)
+    clues = [x[16:-4].replace('<b>', '').replace('</b>','') for x in clues]
+    
+    AcrossClues = []
+    DownClues = []
+    for clue in clues:
+        if clue.strip().upper() == 'ACROSS':
+            clueType = 'ACROSS'
+            continue
+        elif clue.strip().upper() == 'DOWN':
+            clueType = 'DOWN'
+            continue
+        else:
+            if clueType == 'ACROSS':
+                AcrossClues.append(clue)
+            else:
+                DownClues.append(clue)
+    
+    AcrossClues = [ (x + ')', 'ACROSS') for x in "".join(AcrossClues).split(')') if x.strip() != '']
+    DownClues = [ (x + ')', 'DOWN') for x in "".join(DownClues).split(')') if x.strip() != '']
+    
+    clues = AcrossClues
+    clues.extend(DownClues)
+    
+    clues = Clues(clues)
+    print clues
+
+    return clues
+    
+class Clue(object):
+    __slots__ =  ('type','position', 'clue', 'spaces')
+    def __init__(self, clueString, type):
+        for field in self.__slots__:
+            setattr(self, field, None)
+        self.type = type.upper()
+        rawClue = clueString.strip()
+        for n in range(2,0,-1):
+            if (not rawClue[0:n].strip().isalpha()):
+                try:
+                    self.position = int(rawClue[0:n].strip())
+                except ValueError:
+                    continue
+                
+                self.spaces = '(' + rawClue.split('(')[-1]
+                self.clue = rawClue[n:-1*len(self.spaces)].strip()
+                break
+    def as_str(self, separator='\n', show_name=True):
+        ''' displays objects as name=value pairs separated by
+            character separator
+        '''
+        output = []
+        for field in self.__slots__:
+            value = getattr(self, field, None)
+            valueFormat = '%s'
+            if show_name:
+                valueFormat = ('%s=' % field) + valueFormat
+            output.append(valueFormat % str(value))
+        return separator.join(output)
+    def __str__(self):
+        return self.as_str(' ', False)
+
+class Clues(list):
+    containedClass = Clue
+    def __init__(self, clueList):
+        for inputData in clueList:
+            self.append(self.containedClass(*inputData))
+    def as_str(self, separator=', ', show_header=True, indent=''):
+        ''' Used to print a table with names of the field as a header row
+            and subsequent rows contain the values all separated by commas
+        '''
+        nameStr = ''
+        return nameStr + '\n'.join(
+            indent + item.as_str(separator, False) for item in self)
+    def __str__(self):
+        return self.as_str(' ', False, '\t')
 
 class ImageScraper(object):
     puzzle = None
@@ -100,13 +179,24 @@ class ImageScraper(object):
         return getCrosswordURL(pageURL, 'puzzle')
 
 
+
+
     def setPuzzleNumberAndClues(self):
         number = 0
-        if self.puzzleURL is not None:
-            puzzleHtml = getResponseString(self.puzzleURL)
-            numPattern = re.search(r'The\s\s?Hindu\s\s?Crossword.*?[0-9]{2,5}', puzzleHtml)
-            if numPattern is not None:
-                number = int(numPattern.group(0).split(' ')[-1])
+        if self.puzzleURL is None:
+            self.number = number
+            return
+        
+        puzzleHtml = getResponseString(self.puzzleURL)
+        numPattern = re.search(r'The\s\s?Hindu\s\s?Crossword.*?[0-9]{2,5}', puzzleHtml)
+        if numPattern is not None:
+            number = int(numPattern.group(0).split(' ')[-1])
+        imgPatterns = re.finditer(r'<img src="http://www.thehindu.com/multimedia/dynamic/.*?CROSS.*?.jpg\s?".*?"/>', puzzleHtml)
+        images = []
+        for img in imgPatterns:
+            images.append(img.group(0).split('"')[1])
+        
+        self.clues = getCluesFromHTML(puzzleHtml)
         self.number = number
         
         
@@ -125,6 +215,7 @@ class ImageScraper(object):
 
     
 #    def getPuzzleImage(self):
+        
     
 #    def getSolutionImage(self):
 
@@ -148,9 +239,15 @@ class ImageScraper(object):
         return self.as_str()
 
 if __name__ == '__main__':
-     print ImageScraper(date(2013,5,19))
-     print 
-     print ImageScraper(date(2003,5,19))
-     print 
-     print ImageScraper(date(2006,1,1))
+    
+    startDate = date.today()
+    
+    for day in (startDate - timedelta(n) for n in range(100)):
+        print ImageScraper(day)
+        print 
+#    print ImageScraper(date(2013,5,19))
+#    print 
+#    print ImageScraper(date(2003,5,19))
+#    print 
+#    print ImageScraper(date(2006,1,1))
      
