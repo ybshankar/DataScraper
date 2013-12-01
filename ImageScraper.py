@@ -6,11 +6,12 @@ Created on Nov 25, 2013
 from datetime import *
 
 import urllib2
-import re
+import re, htmlentitydefs
 import os, sys
 from SolutionGridExtractor import *
 import StringIO
 from PIL import Image
+import puz
 
 
 def getResponseString(URL):
@@ -90,7 +91,6 @@ def getImageURLs(htmlString):
         images.append(img.group(0).split('"')[1])
     return images
 
-
 def getCluesFromHTML(htmlString):
     puzzleHTML =htmlString.replace('\n', '')
     puzzleHTML =puzzleHTML.replace('\r', '')
@@ -129,6 +129,27 @@ def getCluesFromHTML(htmlString):
     clues = Clues(clues)
     return clues
 
+def unescape(text):
+    def fixup(m):
+        text = m.group(0)
+        if text[:2] == "&#":
+            # character reference
+            try:
+                if text[:3] == "&#x":
+                    return unichr(int(text[3:-1], 16))
+                else:
+                    return unichr(int(text[2:-1]))
+            except ValueError:
+                pass
+        else:
+            # named entity
+            try:
+                text = unichr(htmlentitydefs.name2codepoint[text[1:-1]])
+            except KeyError:
+                pass
+        return text # leave as is
+    return re.sub("&#?\w+;", fixup, text)
+
 CLUETYPE= {'ACROSS' : 0, 'DOWN': 1}
 
 class Clue(object):
@@ -147,7 +168,7 @@ class Clue(object):
                     continue
                 
                 self.spaces = '(' + rawClue.split('(')[-1]
-                self.clue = rawClue[n:-1*len(self.spaces)].strip()
+                self.clue = unescape(rawClue[n:-1*len(self.spaces)].strip())
                 break
 
     def __eq__(self, other):
@@ -295,6 +316,22 @@ class ImageScraper(object):
                     break
                 self.solutionDate= getNextSolutionDate(self.solutionDate)
 
+    def exportToPuz(self, filename=None):
+        p = puz.Puzzle()
+        p.puzzletype == puz.PuzzleType.Normal
+        p.title = 'The Hindu Crossword No. %s' % ( str(self.number))
+        p.copyright = u'Copyright \xa9 ' + self.puzzleDate.strftime(r'%Y/%m/%d/') +', The Hindu'
+        p.width = 15
+        p.height = 15
+        p.fill = self.puzzle.replace('\n','').replace('#','.').replace('_','-')
+        p.solution = self.solution.replace('\n','').replace('#','.')
+        p.clues = self.clues.getPuzClues()
+        if filename is None:
+            filename = os.path.join(os.path.dirname(__file__),'puzzles', 'puzfiles',str(self.number)+'.puz')
+        puzFile=open(filename, 'wb')
+        puzFile.write(p.tostring())
+        puzFile.close()
+
     def as_str(self, indent=''):
         out = []
         msg = 'The Hindu Crossword No. %s' % ( str(self.number))
@@ -331,16 +368,33 @@ class ImageScraper(object):
 
     def __str__(self):
         return self.as_str()
+    
 
 if __name__ == '__main__':
-    
+    import timeit
+    startDate = date.today()
+    for day in (startDate - timedelta(n) for n in range(100)):
+        try:
+            starttime = datetime.now()
+            I = ImageScraper(day)
+            print I
+            I.exportToPuz()
+            print
+            print "Time Taken : " + str(datetime.now() - starttime)
+            print
+        except Exception as e:
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            print(exc_type, fname, exc_tb.tb_lineno)
+            pass
+         
 #     startDate = date.today()
 #     #startDate = date(2013,11,23)
 #     for day in (startDate - timedelta(n) for n in range(100)):
 #         print ImageScraper(day)
 #         print
-    print ImageScraper(date(2013,9,12))
- 
+#     I=ImageScraper(date(2013,9,12))
+#     I.exportToPuz()
 #    print ImageScraper(date(2013,5,19))
 #    print 
 #    print ImageScraper(date(2003,5,19))
