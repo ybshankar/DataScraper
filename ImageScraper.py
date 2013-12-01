@@ -12,7 +12,7 @@ from SolutionGridExtractor import *
 import StringIO
 from PIL import Image
 import puz
-
+import logging
 
 def getResponseString(URL):
     htmlStr = None
@@ -289,11 +289,18 @@ class ImageScraper(object):
         self.puzzle = puzzleStr
 
     def setSolutionString(self):
-        if self.solutionImage is None:
+        if self.puzzle is None:
             return
-        solImage = getImageFromURL(self.solutionImage)
-        solStr = parseSolutionImage(solImage)
-        self.solution = solStr
+        elif self.solutionImage is None:
+            self.solution = self.puzzle.replace('_','X')
+        else:
+            solImage = getImageFromURL(self.solutionImage)
+            solStr = parseSolutionImage(solImage)
+            if len(solStr.replace('\n', '')) != len(self.puzzle.replace('\n','')):
+                print "Rejected Solution \n" +solStr
+                solStr = self.puzzle.replace('_','X')
+            self.solution = solStr
+        
 
     def setSolutionImage(self):
         if self.solutionURL is None:
@@ -324,7 +331,11 @@ class ImageScraper(object):
         p.width = 15
         p.height = 15
         p.fill = self.puzzle.replace('\n','').replace('#','.').replace('_','-')
-        p.solution = self.solution.replace('\n','').replace('#','.')
+        if self.solution is not None:
+            p.solution = self.solution.replace('\n','').replace('#','.')
+        else:
+            p.solution = p.fill.replace('-','X')
+        
         p.clues = self.clues.getPuzClues()
         if filename is None:
             filename = os.path.join(os.path.dirname(__file__),'puzzles', 'puzfiles',str(self.number)+'.puz')
@@ -383,9 +394,7 @@ if __name__ == '__main__':
             print "Time Taken : " + str(datetime.now() - starttime)
             print
         except Exception as e:
-            exc_type, exc_obj, exc_tb = sys.exc_info()
-            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-            print(exc_type, fname, exc_tb.tb_lineno)
+            logging.exception(e)
             pass
          
 #     startDate = date.today()
@@ -393,8 +402,8 @@ if __name__ == '__main__':
 #     for day in (startDate - timedelta(n) for n in range(100)):
 #         print ImageScraper(day)
 #         print
-#     I=ImageScraper(date(2013,9,12))
-#     I.exportToPuz()
+#      I=ImageScraper(date(2013,11,27))
+#      I.exportToPuz()
 #    print ImageScraper(date(2013,5,19))
 #    print 
 #    print ImageScraper(date(2003,5,19))
