@@ -8,6 +8,10 @@ from datetime import *
 import urllib2
 import re
 import os, sys
+from SolutionGridExtractor import *
+import StringIO
+from PIL import Image
+
 
 def getResponseString(URL):
     htmlStr = None
@@ -73,6 +77,11 @@ def getCrosswordURL(pageURL, urltype='puzzle', puzzleNum=None):
             return newXWordSolURL
 
     return xWordURL
+
+def getImageFromURL(URL):
+    file = StringIO.StringIO(urllib2.urlopen(URL).read())
+    img = Image.open(file)
+    return img
 
 def getImageURLs(htmlString):
     imgPatterns = re.finditer(r'<img src="http://www.thehindu.com/multimedia/dynamic/.*?CROSS.*?.jpg\s?".*?"/>', htmlString, flags=re.IGNORECASE)
@@ -227,8 +236,9 @@ class ImageScraper(object):
         self.puzzleURL = self.getPuzzleURL()
         self.setSolutionURL()
         self.setPuzzleNumberCluesImage()
+        self.setPuzzleString()
         self.setSolutionImage()
-        
+        self.setSolutionString()
         
     def getPuzzleURL(self):
         pageURL = getPageURL(self.puzzleDate)
@@ -249,6 +259,20 @@ class ImageScraper(object):
             self.puzzleImage = min(*tuple(images))
         self.clues = getCluesFromHTML(puzzleHtml)
         self.number = number
+    
+    def setPuzzleString(self):
+        if self.puzzleImage is None:
+            return
+        puzImage = getImageFromURL(self.puzzleImage)
+        puzzleStr = parsePuzzleImage(puzImage)
+        self.puzzle = puzzleStr
+
+    def setSolutionString(self):
+        if self.solutionImage is None:
+            return
+        solImage = getImageFromURL(self.solutionImage)
+        solStr = parseSolutionImage(solImage)
+        self.solution = solStr
 
     def setSolutionImage(self):
         if self.solutionURL is None:
@@ -290,8 +314,17 @@ class ImageScraper(object):
         if self.solutionImage is not None:
             msg = 'Solution Image %s' 
             out.append(indent + msg % (self.solutionImage))
-        out.append("")
+        if self.puzzle is not None:
+            out.append("")
+            msg = 'Puzzle grid \n%s'
+            if self.solution is not None:
+                gridStr= enhancedPuzzleString(self.puzzle, self.solution)
+            else:
+                gridStr= enhancedPuzzleString(self.puzzle)
+                gridStr = gridStr.replace('\n', '\n'+indent)
+            out.append(msg %gridStr)
         if self.clues is not None:
+            out.append("")
             msg = 'Clues \n%s'
             out.append(indent + msg %(self.clues.as_str('  ', False, indent)))
         return '\n'.join(out)
@@ -301,11 +334,13 @@ class ImageScraper(object):
 
 if __name__ == '__main__':
     
-    startDate = date.today()
-    #startDate = date(2013,11,23)
-    for day in (startDate - timedelta(n) for n in range(100)):
-        print ImageScraper(day)
-        print 
+#     startDate = date.today()
+#     #startDate = date(2013,11,23)
+#     for day in (startDate - timedelta(n) for n in range(100)):
+#         print ImageScraper(day)
+#         print
+    print ImageScraper(date(2013,9,12))
+ 
 #    print ImageScraper(date(2013,5,19))
 #    print 
 #    print ImageScraper(date(2003,5,19))
