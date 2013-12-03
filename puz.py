@@ -302,7 +302,7 @@ class PuzzleBuffer:
     wraps a data buffer ('' or []) and provides .puz-specific methods for
     reading and writing data
     """
-    def __init__(self, data=None, enc='cp1252'):
+    def __init__(self, data=None, enc='ISO-8859-1'):
         self.data = data or []
         self.enc = enc
         self.pos = 0
@@ -348,7 +348,7 @@ class PuzzleBuffer:
 
     def write_string(self, s):
         s = s or ''
-        self.data.append(s.encode(self.enc, 'ignore') + '\0')
+        self.data.append(s.encode(self.enc) + '\0')
 
     def pack(self, format, *values):
         self.data.append(struct.pack(format, *values))
