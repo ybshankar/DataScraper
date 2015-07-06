@@ -365,7 +365,7 @@ class ImageScraper(object):
         if filename is None:
             filename = os.path.join(os.path.dirname(__file__),'puzzles', 'puzfiles',str(self.number)+'.puz')
         puzFile=open(filename, 'wb')
-        puzFile.write(p.tostring())
+        puzFile.write(p.tobytes())
         puzFile.close()
 
     def as_str(self, indent=''):
@@ -427,7 +427,7 @@ if __name__ == '__main__':
 #     for day in (startDate - timedelta(n) for n in range(100)):
 #         print ImageScraper(day)
 #         print
-    I=ImageScraper(date(2013,11,14))
+    I=ImageScraper(date(2015,7,3))
     print I
     I.exportToPuz()
 #    print ImageScraper(date(2013,5,19))

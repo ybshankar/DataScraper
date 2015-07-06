@@ -25,7 +25,7 @@ def parseSolutionImage(solutionImage):
     #processedImage = ImageEnhance.Contrast(processedImage)
     processedImage = processedImage.convert("RGBA")
     pix = processedImage.load()
-    
+#     processedImage.show("30% more contrast")
     for y in xrange(processedImage.size[1]):
         for x in xrange(processedImage.size[0]):
             borderPixel = ((x % cellSize) < 15) or \
@@ -56,7 +56,7 @@ def parseSolutionImage(solutionImage):
 
 
 
-    #processedImage.show("30% more contrast")
+#     processedImage.show("30% more contrast")
     #processedImage = processedImage.convert()
     processedImage = processedImage.convert('L')
     processedImage = processedImage.resize((x, y), Image.NEAREST)
