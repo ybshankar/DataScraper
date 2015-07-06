@@ -10,3 +10,6 @@ Dependencies:
 
 Pillow for windows, 
 pytesser for windows
+flask for providing web server (backend) and interfacing with ember.js
+sqlalchemy for providing the dbconnectvity
+sqllite db for maintaining data.

@@ -91,7 +91,10 @@ def getImageURLs(htmlString):
     #### TODO
     # needs to work with patterns found in page http://www.thehindu.com/todays-paper/tp-miscellaneous/the-hindu-crossword-11436/article7373825.ece
     # use the carousel div to identify the image rather than using the cross word string.
-    imgPatterns = re.finditer(r'<img src="http://www.thehindu.com/multimedia/dynamic/.*?CROSS.*?.jpg\s?".*?"/>', htmlString, flags=re.IGNORECASE)
+#     imgPatterns = re.finditer(r'<img src="http://www.thehindu.com/multimedia/dynamic/.*?CROSS.*?.jpg\s?" height="400".*?"/>', htmlString, flags=re.IGNORECASE)
+    splitString = htmlString.split(r'''<div class="jcarousel-wrapper">''')[1]
+    splitString = splitString.split(r'''<script type="text/javascript">''')[0]
+    imgPatterns = re.finditer(r'<img src="http://www.thehindu.com/multimedia/dynamic/.*?.jpg\s?".*?"/>', splitString, flags=re.IGNORECASE)
     images = []
     for img in imgPatterns:
         images.append(img.group(0).split('"')[1])
@@ -270,7 +273,9 @@ class ImageScraper(object):
     solutionDate = None
     puzzleURL = None
     solutionURL = None
+    puzzleImageCandidates = []
     puzzleImage = None
+    solutionImageCandidates = []
     solutionImage = None
 
     def __init__(self, puzzleDate=date.today(), solutionDate=None):
@@ -307,35 +312,59 @@ class ImageScraper(object):
         self.number = number
         logging.debug('Searching for Images')
         images = getImageURLs(puzzleHtml)
-        logging.debug('%d Images found' %(len(images)))
+        logging.debug('Images found %d' %(len(images)))
         if len(images) > 0:
-            self.puzzleImage = min(*tuple(images))
-            logging.debug('Puzzle Image set to %s' %(self.puzzleImage))
+            self.puzzleImageCandidates = images
+            logging.debug('Puzzle Image candidates are set to %s' %('\n'.join (self.puzzleImageCandidates)))
         logging.debug('Searching for Clues')
         self.clues = getCluesFromHTML(puzzleHtml)
         logging.debug('Clue search completed!')
         
     
     def setPuzzleString(self):
-        if self.puzzleImage is None:
+        if len(self.puzzleImageCandidates) == 0:
             return
-        puzImage = getImageFromURL(self.puzzleImage)
-        puzzleStr = parsePuzzleImage(puzImage)
-        self.puzzle = puzzleStr
+        for puzzleImage in self.puzzleImageCandidates:
+            try:
+                # confirm that this is not a solution image but a genuine puzzle image
+                puzImage = getImageFromURL(puzzleImage)
+                solStr = parseSolutionImage(puzImage)
+                validateSolution(solStr)
+                logging.warn('Image Rejected as puzzle %s' % puzzleImage)
+            except Exception as e:
+                logging.debug(e)
+                puzzleStr = parsePuzzleImage(puzImage)
+                self.puzzle = puzzleStr
+                self.puzzleImage=puzzleImage
+                logging.debug('Puzzle Image Accepted %s' % puzzleImage)
+                break
+
+        if self.puzzleImage is None:
+            logging.error('Unable to find puzzle Image')
+                
+                
 
     def setSolutionString(self):
-        if self.puzzle is None:
-            return
-        elif self.solutionImage is None:
-            self.solution = self.puzzle.replace('_','X')
+        if len(self.solutionImageCandidates) == 0:
+            logging.warn('No solution Image candidates found ')
         else:
-            solImage = getImageFromURL(self.solutionImage)
-            solStr = parseSolutionImage(solImage)
-            validateSolution(solStr)
-#             if len(solStr.replace('\n', '')) != len(self.puzzle.replace('\n','')):
-#                 "Rejected Solution \n" +solStr
-#             solStr = self.puzzle.replace('_','X')
-            self.solution = solStr
+            for solutionImage in self.solutionImageCandidates:
+                try:
+                    solImage = getImageFromURL(solutionImage)
+                    solStr = parseSolutionImage(solImage)
+                    validateSolution(solStr)
+                    self.solution = solStr
+                    self.solutionImage = solutionImage
+                    logging.debug('Solution Image Accepted %s' % solutionImage)
+                    break
+                except Exception as e:
+                    logging.warn('Image Rejected as solution %s' % solutionImage)
+                    logging.warn(e)
+                    pass
+            if self.solution is None:
+                logging.error('Unable to find solution Image - using default solution')
+                self.solution = self.puzzle.replace('_','X')
+            
         
 
     def setSolutionImage(self):
@@ -346,14 +375,11 @@ class ImageScraper(object):
         logging.debug('Solution HTML received, searching for Images')
         images = getImageURLs(solutionHtml)
         logging.debug('Images found %d' %(len(images)))
-        if len(images) > 1:
-            self.solutionImage = images[1]
-            logging.debug('Solution Image found %s' %(self.solutionImage))
-        elif len(images) > 0:
-            self.solutionImage = images[0]
-            logging.debug('Solution Image (suspect) %s' %(self.solutionImage))
+        if len(images) > 0:
+            self.solutionImageCandidates = images
+            logging.debug('Solution Image Candidates found %s' %('\n'.join(images)))
         else:
-            logging.debug('Could not find Solution Image')
+            logging.warn('Could not find Solution Image candidates')
         
         
     def setSolutionURL(self):
@@ -439,13 +465,12 @@ if __name__ == '__main__':
     import timeit
     logging.basicConfig(level=logging.DEBUG,
                         format='%(asctime)-26s %(levelname)-8s %(message)s')
-#     startDate = date.today()
-    startDate = date(2015,7,2)
+    startDate = date.today()
+#     startDate = date(2015,7,4)
 #     print startDate
     for day in (startDate - timedelta(n) for n in range(100)):
         try:
             starttime = datetime.now()
-            print 'Processing crossword for day : %s' % (day)
             I = ImageScraper(day)
             print I
             I.exportToPuz()
