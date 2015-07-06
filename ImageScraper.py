@@ -21,8 +21,8 @@ def getResponseString(URL):
         response = urllib2.urlopen(URL)
         htmlStr = response.read()
     except Exception as e:
-        print 'exception reaching URL %s %s %s' %(URL, e.code, e.msg)
-        print sys.exc_info()
+        print 'exception reaching URL %s %s %s' %(URL)
+        raise(e)
     return htmlStr
 
 def getNextSolutionDate(puzDate):
@@ -42,7 +42,9 @@ def getPageURL(primaryDate):
     return fullURL
     
 def getCrosswordURL(pageURL, urltype='puzzle', puzzleNum=None):
+    logging.debug('Getting URL for %s at %s' %(urltype, pageURL))
     htmlStr = getResponseString(pageURL)
+    logging.debug('Received HTML Response, searching for patterns')
     if htmlStr is None:
         return None
 
@@ -77,7 +79,7 @@ def getCrosswordURL(pageURL, urltype='puzzle', puzzleNum=None):
             return oldXWordSolURL
         elif newXWordSolURL is not None:
             return newXWordSolURL
-
+    logging.debug('Pattern Found: %s' %(xWordURL))
     return xWordURL
 
 def getImageFromURL(URL):
@@ -137,7 +139,6 @@ def validateSolution(solution):
         if len(line) != 15:
             raise Exception("Rejected Solution \n" +solution)
 
-    
 
 def unescape(text):
     def fixup(m):
@@ -273,34 +274,44 @@ class ImageScraper(object):
         '''
         
         '''
+        logging.debug('Started processing puzzle for date %s' % puzzleDate)
         self.puzzleDate = puzzleDate
         self.solutionDate = solutionDate
-        self.puzzleURL = self.getPuzzleURL()
+        self.setPuzzleURL()
         self.setSolutionURL()
         self.setPuzzleNumberCluesImage()
-        self.setPuzzleString()
         self.setSolutionImage()
+        self.setPuzzleString()
         self.setSolutionString()
         
-    def getPuzzleURL(self):
+    def setPuzzleURL(self):
         pageURL = getPageURL(self.puzzleDate)
-        return getCrosswordURL(pageURL, 'puzzle')
+        self.puzzleURL = getCrosswordURL(pageURL, 'puzzle')
+        logging.debug('Puzzle URL %s' % self.puzzleURL)
 
     def setPuzzleNumberCluesImage(self):
         number = 0
         if self.puzzleURL is None:
             self.number = number
             return
-        
+        logging.debug('Retrieving puzzle from the URL %s' % self.puzzleURL)
         puzzleHtml = getResponseString(self.puzzleURL)
+        logging.debug('Puzzle HTML received, searching for Crossword Number')
         numPattern = re.search(r'The\s\s?Hindu\s\s?Crossword.*?[0-9]{2,5}', puzzleHtml)
         if numPattern is not None:
             number = int(numPattern.group(0).split(' ')[-1])
+            logging.debug('Number found - Crossword Number %d' %(number))
+        self.number = number
+        logging.debug('Searching for Images')
         images = getImageURLs(puzzleHtml)
+        logging.debug('%d Images found' %(len(images)))
         if len(images) > 0:
             self.puzzleImage = min(*tuple(images))
+            logging.debug('Puzzle Image set to %s' %(self.puzzleImage))
+        logging.debug('Searching for Clues')
         self.clues = getCluesFromHTML(puzzleHtml)
-        self.number = number
+        logging.debug('Clue search completed!')
+        
     
     def setPuzzleString(self):
         if self.puzzleImage is None:
@@ -313,7 +324,6 @@ class ImageScraper(object):
         if self.puzzle is None:
             return
         elif self.solutionImage is None:
-            raise Exception('No Solution Available')
             self.solution = self.puzzle.replace('_','X')
         else:
             solImage = getImageFromURL(self.solutionImage)
@@ -327,24 +337,40 @@ class ImageScraper(object):
 
     def setSolutionImage(self):
         if self.solutionURL is None:
+            logging.debug('No solution URL found!')
             return
         solutionHtml = getResponseString(self.solutionURL)
+        logging.debug('Solution HTML received, searching for Images')
         images = getImageURLs(solutionHtml)
-        if len(images) > 0:
-            self.solutionImage = max(*tuple(images))
+        logging.debug('Images found %d' %(len(images)))
+        if len(images) > 1:
+            self.solutionImage = images[1]
+            logging.debug('Solution Image found %s' %(self.solutionImage))
+        elif len(images) > 0:
+            self.solutionImage = images[0]
+            logging.debug('Solution Image (suspect) %s' %(self.solutionImage))
+        else:
+            logging.debug('Could not find Solution Image')
+        
         
     def setSolutionURL(self):
         solutionDateUndetermined = (self.puzzleURL is not None) and (self.solutionDate is None)
         if solutionDateUndetermined:
+            logging.debug('Solution URL is undetermined - trying to guess the solution date!!!')
             self.solutionDate = getNextSolutionDate(self.puzzleDate)
             for tries in xrange(5):
+                logging.debug('Guess # %d using solutionDate %s' %(tries, self.solutionDate))
                 if self.solutionDate > date.today():
+                    logging.debug('Solution not yet published!!!')
                     break
                 pageURL = getPageURL(self.solutionDate)
                 self.solutionURL = getCrosswordURL(pageURL, 'solution', self.number)
                 if self.solutionURL is not None:
                     break
                 self.solutionDate= getNextSolutionDate(self.solutionDate)
+        logging.debug('Solution URL %s' % self.solutionURL)
+        if self.solutionURL is None:
+            raise Exception('No Solution Available')
 
     def exportToPuz(self, filename=None):
         #p = puz.read('Crypt.puz')
@@ -407,26 +433,32 @@ class ImageScraper(object):
     
 
 if __name__ == '__main__':
-#     import timeit
+    import timeit
 #     startDate = date.today()
+#     startDate = date(2015,7,3)
+#     print startDate
 #     for day in (startDate - timedelta(n) for n in range(100)):
 #         try:
 #             starttime = datetime.now()
+#             print 'Processing crossword for day : %s' % (day)
 #             I = ImageScraper(day)
 #             print I
 #             I.exportToPuz()
-#             print
-#             print "Time Taken : " + str(datetime.now() - starttime)
-#             print
 #         except Exception as e:
 #             logging.exception(e)
 #             pass
+#         finally:
+#             print
+#             print "Time Taken : " + str(datetime.now() - starttime)
+#             print
 #          
 #     startDate = date.today()
 #     #startDate = date(2013,11,23)
 #     for day in (startDate - timedelta(n) for n in range(100)):
 #         print ImageScraper(day)
 #         print
+    logging.basicConfig(level=logging.DEBUG,
+                        format='%(asctime)-26s %(levelname)-8s %(message)s')
     I=ImageScraper(date(2015,7,3))
     print I
     I.exportToPuz()
