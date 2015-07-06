@@ -88,6 +88,9 @@ def getImageFromURL(URL):
     return img
 
 def getImageURLs(htmlString):
+    #### TODO
+    # needs to work with patterns found in page http://www.thehindu.com/todays-paper/tp-miscellaneous/the-hindu-crossword-11436/article7373825.ece
+    # use the carousel div to identify the image rather than using the cross word string.
     imgPatterns = re.finditer(r'<img src="http://www.thehindu.com/multimedia/dynamic/.*?CROSS.*?.jpg\s?".*?"/>', htmlString, flags=re.IGNORECASE)
     images = []
     for img in imgPatterns:
@@ -434,34 +437,35 @@ class ImageScraper(object):
 
 if __name__ == '__main__':
     import timeit
+    logging.basicConfig(level=logging.DEBUG,
+                        format='%(asctime)-26s %(levelname)-8s %(message)s')
 #     startDate = date.today()
-#     startDate = date(2015,7,3)
+    startDate = date(2015,7,2)
 #     print startDate
-#     for day in (startDate - timedelta(n) for n in range(100)):
-#         try:
-#             starttime = datetime.now()
-#             print 'Processing crossword for day : %s' % (day)
-#             I = ImageScraper(day)
-#             print I
-#             I.exportToPuz()
-#         except Exception as e:
-#             logging.exception(e)
-#             pass
-#         finally:
-#             print
-#             print "Time Taken : " + str(datetime.now() - starttime)
-#             print
+    for day in (startDate - timedelta(n) for n in range(100)):
+        try:
+            starttime = datetime.now()
+            print 'Processing crossword for day : %s' % (day)
+            I = ImageScraper(day)
+            print I
+            I.exportToPuz()
+        except Exception as e:
+            logging.exception(e)
+            pass
+        finally:
+            print
+            print "Time Taken : " + str(datetime.now() - starttime)
+            print
 #          
 #     startDate = date.today()
 #     #startDate = date(2013,11,23)
 #     for day in (startDate - timedelta(n) for n in range(100)):
 #         print ImageScraper(day)
 #         print
-    logging.basicConfig(level=logging.DEBUG,
-                        format='%(asctime)-26s %(levelname)-8s %(message)s')
-    I=ImageScraper(date(2015,7,3))
-    print I
-    I.exportToPuz()
+
+#     I=ImageScraper(date(2015,7,3))
+#     print I
+#     I.exportToPuz()
 #    print ImageScraper(date(2013,5,19))
 #    print 
 #    print ImageScraper(date(2003,5,19))
