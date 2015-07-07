@@ -21,7 +21,7 @@ def getResponseString(URL):
         response = urllib2.urlopen(URL)
         htmlStr = response.read()
     except Exception as e:
-        print 'exception reaching URL %s %s %s' %(URL)
+        print 'exception reaching URL %s' %(URL)
         raise(e)
     return htmlStr
 
