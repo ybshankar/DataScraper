@@ -140,10 +140,15 @@ def getCluesFromHTML(htmlString):
 
 def validateSolution(solution):
     splitSolution = solution.split('\n')
+    if len(''.join(set(solution))) <= 15:
+       raise Exception("The solution is probably wrong as it contains less than 15  distinct characters in total\n" + solution)
     splitSolution = [x for x in splitSolution if x !='']
     for line in splitSolution:
-        if len(line) != 15:
-            raise Exception("Rejected Solution \n" +solution)
+        if bool(re.search(r'\d', line)):
+            raise Exception("Rejected Solution  - the solution contains numbers\n" +solution)
+        else:
+             if len(line) != 15:
+                 raise Exception("Rejected Solution  - character count mismatch\n" +solution)
 
 
 def unescape(text):
@@ -330,9 +335,8 @@ class ImageScraper(object):
                 puzImage = getImageFromURL(puzzleImage)
                 solStr = parseSolutionImage(puzImage)
                 validateSolution(solStr)
-                logging.warn('Image Rejected as puzzle %s' % puzzleImage)
+                logging.warn('Image Rejected as puzzle %s as it parses to \n%s' % (puzzleImage, solStr))
             except Exception as e:
-                logging.debug(e)
                 puzzleStr = parsePuzzleImage(puzImage)
                 self.puzzle = puzzleStr
                 self.puzzleImage=puzzleImage
@@ -341,6 +345,7 @@ class ImageScraper(object):
 
         if self.puzzleImage is None:
             logging.error('Unable to find puzzle Image')
+            raise Exception('Puzzle Image not found')
                 
                 
 
@@ -352,6 +357,7 @@ class ImageScraper(object):
                 try:
                     solImage = getImageFromURL(solutionImage)
                     solStr = parseSolutionImage(solImage)
+                    solStr = solStr.replace(' ', '')
                     validateSolution(solStr)
                     self.solution = solStr
                     self.solutionImage = solutionImage
@@ -363,7 +369,8 @@ class ImageScraper(object):
                     pass
             if self.solution is None:
                 logging.error('Unable to find solution Image - using default solution')
-                self.solution = self.puzzle.replace('_','X')
+                raise Exception('No Solution Available')
+#                 self.solution = self.puzzle.replace('_','X')
             
         
 
@@ -465,10 +472,10 @@ if __name__ == '__main__':
     import timeit
     logging.basicConfig(level=logging.DEBUG,
                         format='%(asctime)-26s %(levelname)-8s %(message)s')
-    startDate = date.today()
-#     startDate = date(2015,7,4)
+#     startDate = date.today()
+    startDate = date(2015,7,3)
 #     print startDate
-    for day in (startDate - timedelta(n) for n in range(100)):
+    for day in (startDate - timedelta(n) for n in range(10000)):
         try:
             starttime = datetime.now()
             I = ImageScraper(day)

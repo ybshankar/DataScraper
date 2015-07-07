@@ -3,7 +3,7 @@ from PIL import ImageEnhance
 from PIL import ImageFilter, ImageChops
 from pytesser import *
 from urllib import urlretrieve
-
+from math import hypot, pi, cos, sin
 
 def trimBorders(image):
     x,y = image.size
@@ -15,7 +15,7 @@ def trimBorders(image):
     if bbox:
         return image.crop(bbox)
 
-def parseSolutionImage(solutionImage):
+def parseSolutionImage(solutionImage, debug=False):
     solutionString = ''
     processedImage = trimBorders(solutionImage)
     numCells = 15
@@ -25,7 +25,9 @@ def parseSolutionImage(solutionImage):
     #processedImage = ImageEnhance.Contrast(processedImage)
     processedImage = processedImage.convert("RGBA")
     pix = processedImage.load()
-#     processedImage.show("30% more contrast")
+    if debug:
+        processedImage.show("30% more contrast")
+        print image_to_string(processedImage, True)
     for y in xrange(processedImage.size[1]):
         for x in xrange(processedImage.size[0]):
             borderPixel = ((x % cellSize) < 15) or \
@@ -34,7 +36,7 @@ def parseSolutionImage(solutionImage):
                           ((y % cellSize) > (cellSize - 15))
             if borderPixel:
                 pix[x, y] = (255, 255, 255, 255)
-            elif pix[x, y] <=  (30, 30, 30, 255):
+            elif pix[x, y] <=  (50, 50, 50, 255):
                 pix[x, y] = (0, 0, 0, 255)
             else:
                 pix[x, y] = (255, 255, 255, 255)
@@ -42,27 +44,40 @@ def parseSolutionImage(solutionImage):
     hashImage = Image.open("hash.png")
     hashImage = hashImage.resize((cellSize, cellSize), Image.NEAREST)
     
+    borderDelta = 3*5
+    
     for cellY in xrange(numCells):
         for cellX in xrange(numCells):
             startX = int(cellX*cellSize)
             startY = int(cellY*cellSize)
-            box = (startX, startY , startX + cellSize, startY+cellSize)
-            cellImage = processedImage.crop(box)
+            
+            box = (startX , startY , startX + cellSize , startY + cellSize )
+            box1 = (startX + borderDelta, startY + borderDelta , startX + cellSize - borderDelta, startY + cellSize - borderDelta)
+            cellImage = processedImage.crop(box1)
+#             cellImage = trimBorders(cellImage)
+#             cellImage = 
             #cellImage.show("")
+            
             colors = cellImage.getcolors()
-              
+            
             if len(colors) == 1:
                 processedImage.paste(hashImage, box)
+#             if (cellX == 8) and (cellY == 14):
+#                 cellImage.show("30% more contrast")
 
 
 
-#     processedImage.show("30% more contrast")
+    if debug:
+        processedImage.show("30% more contrast")
+        print image_to_string(processedImage, True)
     #processedImage = processedImage.convert()
     processedImage = processedImage.convert('L')
     processedImage = processedImage.resize((x, y), Image.NEAREST)
     
-    filteredImage = filterAndReturnImage(processedImage, minFilter=7, maxFilter=0, blur=False)
-#     filteredImage.show("30% more contrast")
+    filteredImage = filterAndReturnImage(processedImage, minFilter=9, maxFilter=0, blur=False)
+    if debug:
+        filteredImage.show("30% more contrast")
+        print image_to_string(processedImage, True)
 #     filteredImage.save("test.bmp")
 #     solutionString = "Filters : minFilter=9, maxFilter=0, blur=True \n\n"
 #     solutionString =  solutionString + image_to_string(filteredImage, True) +'\n\n'
@@ -238,6 +253,20 @@ def enhancedPuzzleString(puzzleStr, solutionString=None):
     enhPuzzleGrid = "\n".join(enhPuzzleGrid)
     return enhPuzzleGrid
 
+
+def binarizeImage(inImage, threshold=(230, 230, 230, 255)):
+    inImage = inImage.filter(ImageFilter.BLUR)
+    pix = inImage.load()
+    for y in xrange(inImage.size[1]):
+        for x in xrange(inImage.size[0]):
+            if pix[x, y] <= threshold :
+                pix[x, y] = (0, 0, 0, 255)
+            else:
+                pix[x, y] = (255, 255, 255, 255)
+    
+    inImage = inImage.convert('L')
+    return inImage
+    
 def test_solutionParsing(puzzleNum=10875):
      solution = Image.open("puzzles/solution/"+ str(puzzleNum)+".jpg")
      print parseSolutionImage(solution)
@@ -256,9 +285,9 @@ def test_parseCompleteCrossword(puzzleNum=10875):
     print enhancedPuzzleString(puzzleStr, solutionStr)
 
 if  __name__ =='__main__':
-#     test_puzzleParsing()
-#     test_solutionParsing()
-    test_parseCompleteCrossword()
+#     test_puzzleParsing(puzzleNum=11360)
+    test_solutionParsing(puzzleNum=11362)
+#     test_parseCompleteCrossword()
 #    puzzleNum = 10875
 #     solution = Image.open("puzzles/solution/"+ str(puzzleNum)+".jpg")
 #     print parseSolutionImage(solution)
