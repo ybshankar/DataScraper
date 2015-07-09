@@ -112,6 +112,7 @@ def getCluesFromHTML(htmlString):
 
     clues = re.findall(r'<p class="body">.*?</p>', puzzleHTML)
     clues = [x[16:-4].replace('<b>', '').replace('</b>','') for x in clues]
+    rawClues = clues
     
     AcrossClues = []
     DownClues = []
@@ -140,7 +141,7 @@ def getCluesFromHTML(htmlString):
 #     DownClues = [ (x + ')', 'DOWN') for x in "".join(DownClues).split(')') if x.strip() != '']
     clues = AcrossClues
     clues.extend(DownClues)
-    return clues
+    return rawClues, clues
 
 
 def unescape(text):
@@ -181,6 +182,7 @@ class ArtifactScraper(object):
     puzzleNumber = None
     solutionNumber = None
     clues = None
+    rawClues = []
     pageImages = []
 
     def __init__(self, pageDate=date.today()):
@@ -206,15 +208,15 @@ class ArtifactScraper(object):
             number = int(numPattern.group(0).split(' ')[-1])
             logging.debug('Puzzle Number found - Crossword Number %d' %(number))
         self.puzzleNumber = number
-        solnNumPattern = numPattern = re.search(r'Solution\s?to\s?puzzle.*?[0-9]{2,5}', pageHtml)
-        if solnNumPattern is not None:
+        solNumPattern = numPattern = re.search(r'Solution\s?to\s?puzzle.*?[0-9]{2,5}', pageHtml)
+        if solNumPattern is not None:
             solNumber = int(solNumPattern.group(0).split(' ')[-1])
             logging.debug('Solution Number found - Crossword Number %d' %(solNumber))
         self.solutionNumber = solNumber
         logging.debug('Searching for Images')
-        self.pageImages = getImageURLs(puzzleHtml)
+        self.pageImages = getImageURLs(pageHtml)
         logging.debug('Images found on the page are %s' %('\n'.join (self.pageImages)))
-        self.clues = getCluesFromHTML(puzzleHtml)
+        self.rawClues, self.clues = getCluesFromHTML(pageHtml)
         logging.debug('Clue search completed!')
         
     def as_str(self, indent=''):
@@ -228,13 +230,14 @@ class ArtifactScraper(object):
         msg = 'Solution to puzzle %s' % ( str(self.solutionNumber))
         out.append(indent + msg)
         if len(self.pageImages) > 0:
-            for idx, imgURL in self.pageImages:
-                msg = ' Candidate Images %d : %s' %idx 
-                out.append(indent + msg % (idx+1, self.puzzleImage))
-        if self.clues is not None:
+            for idx, imgURL in enumerate(self.pageImages):
+                msg = 'Candidate Images %d : %s' 
+                out.append(indent + msg % (idx+1, imgURL))
+        if self.rawClues is not None:
             out.append("")
             msg = 'Clues \n%s'
-            out.append(indent + msg %('\n'.join(self.clues)))
+#             out.append(indent + msg)
+            out.append(indent + msg %('\n'.join(self.rawClues)))
         return '\n'.join(out)
 
     def __str__(self):
