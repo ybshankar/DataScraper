@@ -218,6 +218,11 @@ class ArtifactScraper(object):
         logging.debug('Images found on the page are %s' %('\n'.join (self.pageImages)))
         self.rawClues, self.clues = getCluesFromHTML(pageHtml)
         logging.debug('Clue search completed!')
+    
+    def getYamlDict(self):
+        yamlDict = {}
+        yamlDict[self.pageDate]={'puzzleNumber':self.puzzleNumber, 'solutionNumber':self.solutionNumber,'Images': self.pageImages, 'rawClues': self.rawClues}
+        return yamlDict
         
     def as_str(self, indent=''):
         out = []
@@ -250,12 +255,17 @@ if __name__ == '__main__':
                         format='%(asctime)-26s %(levelname)-8s %(message)s')
 #     startDate = date.today()
     startDate = date(2015,7,3)
+    filename = os.path.abspath(os.path.join(__file__, '..', 'puzzles', 'pageData.yaml'))
+    yamlDict = loadYamlFile(filename)
 #     print startDate
     for day in (startDate - timedelta(n) for n in range(1)):
         try:
             starttime = datetime.now()
+            
             I = ArtifactScraper(day)
             print I
+            yamlDict.update(I.getYamlDict())
+            
         except Exception as e:
             logging.exception(e)
             pass
