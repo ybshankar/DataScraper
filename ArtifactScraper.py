@@ -22,8 +22,8 @@ def loadYamlFile(filename):
     return yamlDoc
 
 def writeYamlDocToFile(yamlDoc, filename):
-    with open(filename, 'w') as cf:
-        cf.write(yaml.dump(yamlDoc, default_flow_style=True))
+    with open(filename, 'wb') as cf:
+        cf.write(yaml.dump(yamlDoc))
 
 def getResponseString(URL):
     htmlStr = None
@@ -178,6 +178,7 @@ def unescape(text):
 
 class ArtifactScraper(object):
     pageDate = None
+    miscPageURL = None
     pageURL = None
     puzzleNumber = None
     solutionNumber = None
@@ -194,8 +195,9 @@ class ArtifactScraper(object):
         
     def setPuzzleNumberCluesImage(self):
         number = 0
-        pageURL = getPageURL(self.pageDate)
-        self.pageURL = getCrosswordURL(pageURL, 'puzzle')
+        solNumber=0
+        self.miscPageURL = getPageURL(self.pageDate)
+        self.pageURL = getCrosswordURL(self.miscPageURL, 'puzzle')
         logging.debug('Crossword Page URL %s' % self.pageURL)
         if self.pageURL is None:
             self.puzzleNumber = number
@@ -221,13 +223,20 @@ class ArtifactScraper(object):
     
     def getYamlDict(self):
         yamlDict = {}
-        yamlDict[self.pageDate]={'puzzleNumber':self.puzzleNumber, 'solutionNumber':self.solutionNumber,'Images': self.pageImages, 'rawClues': self.rawClues}
+        yamlDict[str(self.pageDate)]={'puzzleNumber':self.puzzleNumber,
+                                      'miscPageURL': self.miscPageURL, 
+                                      'pageURL': self.pageURL, 
+                                 'solutionNumber':self.solutionNumber,
+                                 'Images': self.pageImages, 
+                                 'rawClues': self.rawClues}
         return yamlDict
         
     def as_str(self, indent=''):
         out = []
         msg = 'Date %s' 
         out.append(indent + msg % (self.pageDate))
+        msg = 'Archive Page URL %s' 
+        out.append(indent + msg % (self.miscPageURL))
         msg = 'Page URL %s' 
         out.append(indent + msg % (self.pageURL))
         msg = 'The Hindu Crossword No. %s' % ( str(self.puzzleNumber))
@@ -253,19 +262,32 @@ if __name__ == '__main__':
     import timeit
     logging.basicConfig(level=logging.DEBUG,
                         format='%(asctime)-26s %(levelname)-8s %(message)s')
-#     startDate = date.today()
-    startDate = date(2015,7,3)
+    
+    hdlr = logging.FileHandler(os.path.abspath(os.path.join(__file__, '..', 'puzzles', 'pageData.log')))
+    formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+    hdlr.setFormatter(formatter)
+    logger = logging.getLogger()
+    logger.addHandler(hdlr) 
+    startDate = date.today()
+#     startDate = date(2015,7,3)
     filename = os.path.abspath(os.path.join(__file__, '..', 'puzzles', 'pageData.yaml'))
-    yamlDict = loadYamlFile(filename)
+    try:
+        yamlDict = loadYamlFile(filename)
+    except:
+        yamlDict = None
+    finally:
+        if yamlDict == None:
+            yamlDict = {}
 #     print startDate
-    for day in (startDate - timedelta(n) for n in range(1)):
+    for day in (startDate - timedelta(n) for n in range(10000)):
         try:
             starttime = datetime.now()
             
             I = ArtifactScraper(day)
             print I
+#             print I.getYamlDict()
             yamlDict.update(I.getYamlDict())
-            
+            writeYamlDocToFile(yamlDict, filename)
         except Exception as e:
             logging.exception(e)
             pass
