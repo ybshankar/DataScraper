@@ -15,6 +15,8 @@ from PIL import Image
 import puz
 import logging
 import yaml
+from collections import OrderedDict
+from json import loads, dumps
 
 def loadYamlFile(filename):
     with open(filename, 'r') as cf:
@@ -58,10 +60,12 @@ def getCrosswordURL(pageURL, urltype='puzzle', puzzleNum=None):
     if htmlStr is None:
         return None
 
-    xWordURL = re.search(r'<a.*?>The\s?\s?Hindu\s?\s?Crossword\s?\s?.*?</a>', htmlStr)
+    xWordURL = re.search(r'<a.*?>The\s?\s?Hindu\s?\s?Crossword\s?\s?.*?</a>', htmlStr, flags=re.IGNORECASE)
     
     if xWordURL is None:
-        return None
+        xWordURL = re.search(r'<a.*?>.*guardian.*crossword\s?\s?.*?</a>', htmlStr, flags=re.IGNORECASE)
+        if xWordURL is None:
+            return None
 
     xWordURL = xWordURL.group(0).split('"')[-2]
     xWordURLList = pageURL.split('/')[:-1]
@@ -70,11 +74,11 @@ def getCrosswordURL(pageURL, urltype='puzzle', puzzleNum=None):
         xWordURLList.append(xWordURL)
         xWordURL='/'.join(xWordURLList)
     if puzzleNum is not None:
-        oldXWordSolURL = re.search(r'<a.*?>Solution\s?\s?to\s?\s?Puzzle.*?'+str(puzzleNum)+'.*?</a>', htmlStr)
-        newXWordSolURL = re.search(r'<a.*?>Solution No.*?'+str(puzzleNum)+'.*?</a>', htmlStr)
+        oldXWordSolURL = re.search(r'<a.*?>Solution\s?\s?to\s?\s?Puzzle.*?'+str(puzzleNum)+'.*?</a>', htmlStr, flags=re.IGNORECASE)
+        newXWordSolURL = re.search(r'<a.*?>Solution No.*?'+str(puzzleNum)+'.*?</a>', htmlStr, flags=re.IGNORECASE)
     else:
-        oldXWordSolURL = re.search(r'<a.*?>Solution\s?\s?to\s?\s?Puzzle.*?</a>', htmlStr)
-        newXWordSolURL = re.search(r'<a.*?>Solution No .*?</a>', htmlStr)
+        oldXWordSolURL = re.search(r'<a.*?>Solution\s?\s?to\s?\s?Puzzle.*?</a>', htmlStr, flags=re.IGNORECASE)
+        newXWordSolURL = re.search(r'<a.*?>Solution No .*?</a>', htmlStr, flags=re.IGNORECASE)
         
     if oldXWordSolURL is not None:
         oldXWordSolURL=oldXWordSolURL.group(0).split('"')[1]
@@ -98,8 +102,11 @@ def getImageURLs(htmlString):
     # needs to work with patterns found in page http://www.thehindu.com/todays-paper/tp-miscellaneous/the-hindu-crossword-11436/article7373825.ece
     # use the carousel div to identify the image rather than using the cross word string.
 #     imgPatterns = re.finditer(r'<img src="http://www.thehindu.com/multimedia/dynamic/.*?CROSS.*?.jpg\s?" height="400".*?"/>', htmlString, flags=re.IGNORECASE)
-    splitString = htmlString.split(r'''<div class="jcarousel-wrapper">''')[1]
-    splitString = splitString.split(r'''<script type="text/javascript">''')[0]
+    if r'''<div class="jcarousel-wrapper">''' in htmlString:
+        splitString = htmlString.split(r'''<div class="jcarousel-wrapper">''')[1]
+        splitString = splitString.split(r'''<script type="text/javascript">''')[0]
+    else:
+        splitString = htmlString
     imgPatterns = re.finditer(r'<img src="http://www.thehindu.com/multimedia/dynamic/.*?.jpg\s?".*?"/>', splitString, flags=re.IGNORECASE)
     images = []
     for img in imgPatterns:
@@ -112,68 +119,8 @@ def getCluesFromHTML(htmlString):
 
     clues = re.findall(r'<p class="body">.*?</p>', puzzleHTML)
     clues = [x[16:-4].replace('<b>', '').replace('</b>','') for x in clues]
-    rawClues = clues
-    
-    AcrossClues = []
-    DownClues = []
-    for clue in clues:
-        if clue.strip().upper() == 'ACROSS':
-            clueType = 'ACROSS'
-            continue
-        elif clue.strip().upper() == 'DOWN':
-            clueType = 'DOWN'
-            continue
-        else:
-            if clueType == 'ACROSS':
-                AcrossClues.append(clue)
-            else:
-                DownClues.append(clue)
-    cluePattern = re.compile("[0-9]{1,2}.*?\([0-9,\-]*.?\)")
-    AcrossCluesRE = re.finditer(cluePattern, " ".join(AcrossClues))
-    DownCluesRE = re.finditer(cluePattern, " ".join(DownClues))
-    AcrossClues = []
-    DownClues = []
-    for item in AcrossCluesRE:
-        AcrossClues.append((item.group(0), 'ACROSS'))
-    for item in DownCluesRE:
-        DownClues.append((item.group(0), 'DOWN'))
-#     AcrossClues = [ (x + ')', 'ACROSS') for x in "".join(AcrossClues).split(')') if x.strip() != '']
-#     DownClues = [ (x + ')', 'DOWN') for x in "".join(DownClues).split(')') if x.strip() != '']
-    clues = AcrossClues
-    clues.extend(DownClues)
-    return rawClues, clues
-
-
-def unescape(text):
-    def fixup(m):
-        text = m.group(0)
-        charMapDict = {'&#8220;':'"',
-                       '&#8221;':'"',
-                       '&#8216;':"'",
-                       '&#8217;':"'",
-                       '&#8230;':"...",
-                       '&#8212': "-"}
-        if text in charMapDict.keys():
-            return charMapDict[text]
-        return text
-#         text = m.group(0)
-#         if text[:2] == "&#":
-#             # character reference
-#             try:
-#                 if text[:3] == "&#x":
-#                     return unicodedata.normalize('NKFD', unichr(int(text[3:-1], 16)))
-#                 else:
-#                     return unicodedata.normalize('NKFD', unichr(int(text[2:-1])))
-#             except ValueError:
-#                 pass
-#         else:
-#             # named entity
-#             try:
-#                 text = unicodedata.normalize('NKFD', unichr(htmlentitydefs.name2codepoint[text[1:-1]]))
-#             except KeyError:
-#                 pass
-#         return text # leave as is
-    return re.sub("&#?\w+;", fixup, text)
+        
+    return  clues
 
 
 class ArtifactScraper(object):
@@ -182,7 +129,6 @@ class ArtifactScraper(object):
     pageURL = None
     puzzleNumber = None
     solutionNumber = None
-    clues = None
     rawClues = []
     pageImages = []
 
@@ -198,30 +144,43 @@ class ArtifactScraper(object):
         solNumber=0
         self.miscPageURL = getPageURL(self.pageDate)
         self.pageURL = getCrosswordURL(self.miscPageURL, 'puzzle')
-        logging.debug('Crossword Page URL %s' % self.pageURL)
         if self.pageURL is None:
-            self.puzzleNumber = number
-            return
+            raise Exception("Unable to detect crossword page URL\n")
+        else:
+            logging.debug('Crossword Page URL %s' % self.pageURL)
         logging.debug('Retrieving puzzle from the URL %s' % self.pageURL)
         pageHtml = getResponseString(self.pageURL)
+        pageImages = getImageURLs(pageHtml)
         logging.debug('Puzzle HTML received, searching for Crossword Number')
-        numPattern = re.search(r'The\s\s?Hindu\s\s?Crossword.*?[0-9]{2,5}', pageHtml)
+        if 'guardian' in self.pageURL.lower():
+            numPattern = re.search(r'The\s\s?guardian\s\s?quick\s\s?Crossword.*?[0-9]{2,5}', pageHtml)
+        else:
+            numPattern = re.search(r'The\s\s?Hindu\s\s?Crossword.*?[0-9]{2,5}', pageHtml)
         if numPattern is not None:
-            number = int(numPattern.group(0).split(' ')[-1])
+            number = int(numPattern.group(0).split(' ')[-1].replace('.', '').replace('No', ''))
             logging.debug('Puzzle Number found - Crossword Number %d' %(number))
         self.puzzleNumber = number
-        solNumPattern = numPattern = re.search(r'Solution\s?to\s?puzzle.*?[0-9]{2,5}', pageHtml)
+        solNumPattern = re.search(r'Solution\s?to\s?puzzle.*?[0-9]{2,5}', pageHtml)
         if solNumPattern is not None:
             solNumber = int(solNumPattern.group(0).split(' ')[-1])
             logging.debug('Solution Number found - Crossword Number %d' %(solNumber))
         self.solutionNumber = solNumber
+        if (self.puzzleNumber != 0) and (self.solutionNumber==0):
+            self.solutionNumber = self.puzzleNumber - 1
+            logging.debug ('Solution Number not found, guessing it based on puzzle number, solution number %d' % self.solutionNumber)
+
         logging.debug('Searching for Images')
-        self.pageImages = getImageURLs(pageHtml)
+        crosswordPageImages= getImageURLs(pageHtml)
+        if len(crosswordPageImages) > 2:
+            self.pageImages = [ x for x in crosswordPageImages if x not in pageImages]
+        else:
+            self.pageImages=crosswordPageImages
         logging.debug('Images found on the page are %s' %('\n'.join (self.pageImages)))
-        self.rawClues, self.clues = getCluesFromHTML(pageHtml)
+        self.rawClues= getCluesFromHTML(pageHtml)
         logging.debug('Clue search completed!')
     
     def getYamlDict(self):
+
         yamlDict = {}
         yamlDict[str(self.pageDate)]={'puzzleNumber':self.puzzleNumber,
                                       'miscPageURL': self.miscPageURL, 
@@ -259,6 +218,7 @@ class ArtifactScraper(object):
     
 
 if __name__ == '__main__':
+    excludedDatesList=['2015-06-14', '2015-04-12']
     import timeit
     logging.basicConfig(level=logging.DEBUG,
                         format='%(asctime)-26s %(levelname)-8s %(message)s')
@@ -278,23 +238,24 @@ if __name__ == '__main__':
     finally:
         if yamlDict == None:
             yamlDict = {}
+#     yamlDict = OrderedDict(sorted(yamlDict.items(), key=lambda x:x[1], reverse=True))
 #     print startDate
     for day in (startDate - timedelta(n) for n in range(10000)):
-        try:
-            starttime = datetime.now()
-            
-            I = ArtifactScraper(day)
-            print I
-#             print I.getYamlDict()
-            yamlDict.update(I.getYamlDict())
-            writeYamlDocToFile(yamlDict, filename)
-        except Exception as e:
-            logging.exception(e)
-            pass
-        finally:
-            print
-            print "Time Taken : " + str(datetime.now() - starttime)
-            print
+        if (str(day) not in yamlDict.keys()) and (str(day) not in excludedDatesList):
+            try:
+                starttime = datetime.now()
+                
+                I = ArtifactScraper(day)
+                print I
+                yamlDict.update(I.getYamlDict())
+                writeYamlDocToFile(yamlDict, filename)
+            except Exception as e:
+                logging.exception(e)
+                pass
+            finally:
+                print
+                print "Time Taken : " + str(datetime.now() - starttime)
+                print
 #          
 #     startDate = date.today()
 #     #startDate = date(2013,11,23)
