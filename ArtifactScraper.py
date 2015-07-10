@@ -218,7 +218,7 @@ class ArtifactScraper(object):
     
 
 if __name__ == '__main__':
-    excludedDatesList=['2015-06-14', '2015-04-12']
+    excludedDatesList=['2015-06-14', '2015-04-12', '2015-01-16', '2014-11-17', '2014-10-23', '2014-10-04', ]
     import timeit
     logging.basicConfig(level=logging.DEBUG,
                         format='%(asctime)-26s %(levelname)-8s %(message)s')
