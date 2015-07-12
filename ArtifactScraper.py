@@ -60,7 +60,7 @@ def getCrosswordURL(pageURL, urltype='puzzle', puzzleNum=None):
     if htmlStr is None:
         return None
 
-    xWordURL = re.search(r'<a.*?>The\s?\s?Hindu\s?\s?Crossword\s?\s?.*?</a>', htmlStr, flags=re.IGNORECASE)
+    xWordURL = re.search(r'<a.*?>.*?\s?\s?Hindu\s?\s?Crossword\s?\s?.*?</a>', htmlStr, flags=re.IGNORECASE)
     
     if xWordURL is None:
         xWordURL = re.search(r'<a.*?>.*guardian.*crossword\s?\s?.*?</a>', htmlStr, flags=re.IGNORECASE)
@@ -119,7 +119,7 @@ def getCluesFromHTML(htmlString):
 
     clues = re.findall(r'<p class="body">.*?</p>', puzzleHTML)
     clues = [x[16:-4].replace('<b>', '').replace('</b>','') for x in clues]
-        
+    
     return  clues
 
 
@@ -218,7 +218,21 @@ class ArtifactScraper(object):
     
 
 if __name__ == '__main__':
-    excludedDatesList=['2015-06-14', '2015-04-12', '2015-01-16', '2014-11-17', '2014-10-23', '2014-10-04', ]
+    excludedDatesList=['2015-06-14', '2015-04-12', '2015-01-16', 
+                       '2014-11-17', '2014-10-23', '2014-10-04',
+                       '2014-10-03', '2014-09-30', '2014-06-18',
+                       '2014-06-17', '2014-03-30', '2014-02-09',
+                       '2014-02-02', '2014-01-26', '2014-01-19',
+                       '2014-01-15', '2014-01-12', '2013-12-22', 
+                       '2013-11-10', '2013-02-24', '2013-02-17',
+                       '2013-02-10', '2013-02-03', '2013-01-27',
+                       '2013-01-20', '2013-01-13', '2013-01-06',
+                       '2012-12-30', '2012-12-23', '2012-12-16',
+                       '2012-12-09', '2012-12-02', '2012-11-25',
+                       '2012-11-18', '2012-11-11', '2012-11-04',
+                       '2012-10-28', '2012-10-21', '2012-10-14',
+                       '2012-10-07', '2012-09-30', '2012-09-23',
+                       '2012-09-16']
     import timeit
     logging.basicConfig(level=logging.DEBUG,
                         format='%(asctime)-26s %(levelname)-8s %(message)s')
@@ -228,8 +242,8 @@ if __name__ == '__main__':
     hdlr.setFormatter(formatter)
     logger = logging.getLogger()
     logger.addHandler(hdlr) 
-    startDate = date.today()
-#     startDate = date(2015,7,3)
+#     startDate = date.today()
+    startDate = date(2012,07,16)
     filename = os.path.abspath(os.path.join(__file__, '..', 'puzzles', 'pageData.yaml'))
     try:
         yamlDict = loadYamlFile(filename)
