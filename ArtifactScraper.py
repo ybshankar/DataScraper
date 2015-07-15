@@ -53,48 +53,44 @@ def getPageURL(primaryDate):
         fullURL = r'http://www.hindu.com/thehindu/'+ primaryDate.strftime(r'%Y/%m/%d/')+'10hdline.htm'
     return fullURL
     
-def getCrosswordURL(pageURL, urltype='puzzle', puzzleNum=None):
-    logging.debug('Getting URL for %s at %s' %(urltype, pageURL))
-    htmlStr = getResponseString(pageURL)
+def getCrosswordURL(pageURL, htmlStr):
     logging.debug('Received HTML Response, searching for patterns')
     if htmlStr is None:
         return None
+    
+    xWordURLList = pageURL.split('/')[:-1]
+    solnURL = None
 
     xWordURL = re.search(r'<a.*?>.*?\s?\s?Hindu\s?\s?Crossword\s?\s?.*?</a>', htmlStr, flags=re.IGNORECASE)
-    
+    oldXWordSolURL = re.search(r'<a.*?>Solution\s?\s?to\s?\s?Puzzle.*?</a>', htmlStr, flags=re.IGNORECASE)
+    newXWordSolURL = re.search(r'<a.*?>Solution No.*?</a>', htmlStr, flags=re.IGNORECASE)
+        
     if xWordURL is None:
         xWordURL = re.search(r'<a.*?>.*guardian.*crossword\s?\s?.*?</a>', htmlStr, flags=re.IGNORECASE)
         if xWordURL is None:
             return None
-
-    xWordURL = xWordURL.group(0).split('"')[-2]
-    xWordURLList = pageURL.split('/')[:-1]
     
-    if not xWordURL.startswith('http'):
-        xWordURLList.append(xWordURL)
-        xWordURL='/'.join(xWordURLList)
-    if puzzleNum is not None:
-        oldXWordSolURL = re.search(r'<a.*?>Solution\s?\s?to\s?\s?Puzzle.*?'+str(puzzleNum)+'.*?</a>', htmlStr, flags=re.IGNORECASE)
-        newXWordSolURL = re.search(r'<a.*?>Solution No.*?'+str(puzzleNum)+'.*?</a>', htmlStr, flags=re.IGNORECASE)
-    else:
-        oldXWordSolURL = re.search(r'<a.*?>Solution\s?\s?to\s?\s?Puzzle.*?</a>', htmlStr, flags=re.IGNORECASE)
-        newXWordSolURL = re.search(r'<a.*?>Solution No .*?</a>', htmlStr, flags=re.IGNORECASE)
+    if xWordURL is not None:
+        xWordURL = xWordURL.group(0).split('"')[-2]
+        if not xWordURL.startswith('http'):
+            xWordURLList.append(xWordURL)
+            xWordURL='/'.join(xWordURLList)
+        logging.debug('Puzzle Pattern found: %s' %(xWordURL))
+
         
     if oldXWordSolURL is not None:
+        logging.debug('Puzzle Pattern found: %s' %(xWordURL))
         oldXWordSolURL=oldXWordSolURL.group(0).split('"')[1]
-        xWordURLList.append(oldXWordSolURL)
-        oldXWordSolURL='/'.join(xWordURLList)
-    
-    if newXWordSolURL is not None:
-        newXWordSolURL=newXWordSolURL.group(0).split('"')[1]
-    
-    if urltype != 'puzzle':
-        if oldXWordSolURL is not None:
-            return oldXWordSolURL
-        elif newXWordSolURL is not None:
-            return newXWordSolURL
-    logging.debug('Pattern Found: %s' %(xWordURL))
-    return xWordURL
+        if not oldXWordSolURL.startswith('http'):
+            xWordURLList.append(oldXWordSolURL)
+            solnURL='/'.join(xWordURLList)
+        else:
+            solnURL = oldXWordSolURL
+    elif newXWordSolURL is not None:
+        solnURL=newXWordSolURL.group(0).split('"')[1]
+
+    logging.debug('Solution Pattern found: %s' %(solnURL))
+    return xWordURL, solnURL
 
 
 def getImageURLs(htmlString):
@@ -105,6 +101,9 @@ def getImageURLs(htmlString):
     if r'''<div class="jcarousel-wrapper">''' in htmlString:
         splitString = htmlString.split(r'''<div class="jcarousel-wrapper">''')[1]
         splitString = splitString.split(r'''<script type="text/javascript">''')[0]
+    elif r'''<div id="left-column">''' in htmlString:
+        splitString = htmlString.split(r'''<div id="left-column">''')[1]
+        splitString = splitString.split(r'''<div id="right-column">''')[0]
     else:
         splitString = htmlString
     imgPatterns = re.finditer(r'<img src="http://www.thehindu.com/multimedia/dynamic/.*?.jpg\s?".*?"/>', splitString, flags=re.IGNORECASE)
@@ -127,6 +126,7 @@ class ArtifactScraper(object):
     pageDate = None
     miscPageURL = None
     pageURL = None
+    solnURL = None
     puzzleNumber = None
     solutionNumber = None
     rawClues = []
@@ -143,14 +143,18 @@ class ArtifactScraper(object):
         number = 0
         solNumber=0
         self.miscPageURL = getPageURL(self.pageDate)
-        self.pageURL = getCrosswordURL(self.miscPageURL, 'puzzle')
+        logging.debug('Getting URL for puzzle at %s' %(self.miscPageURL))
+        miscHtmlStr = getResponseString(self.miscPageURL)
+        self.pageURL, self.solnURL = getCrosswordURL(self.miscPageURL, miscHtmlStr)
         if self.pageURL is None:
             raise Exception("Unable to detect crossword page URL\n")
         else:
             logging.debug('Crossword Page URL %s' % self.pageURL)
         logging.debug('Retrieving puzzle from the URL %s' % self.pageURL)
         pageHtml = getResponseString(self.pageURL)
-        pageImages = getImageURLs(pageHtml)
+        pageImages = getImageURLs(miscHtmlStr)
+#         pageImages = []
+        
         logging.debug('Puzzle HTML received, searching for Crossword Number')
         if 'guardian' in self.pageURL.lower():
             numPattern = re.search(r'The\s\s?guardian\s\s?quick\s\s?Crossword.*?[0-9]{2,5}', pageHtml)
@@ -160,21 +164,29 @@ class ArtifactScraper(object):
             number = int(numPattern.group(0).split(' ')[-1].replace('.', '').replace('No', ''))
             logging.debug('Puzzle Number found - Crossword Number %d' %(number))
         self.puzzleNumber = number
-        solNumPattern = re.search(r'Solution\s?to\s?puzzle.*?[0-9]{2,5}', pageHtml)
+        solHtml=''
+        if not self.solnURL:
+            solHTML = pageHtml
+            solImages = []
+        else:
+            solHtml = getResponseString(self.solnURL)
+            solImages = getImageURLs(solHtml)
+            
+        solNumPattern = re.search(r'Solution\s?to\s?puzzle.*?[0-9]{2,5}', solHtml)
         if solNumPattern is not None:
             solNumber = int(solNumPattern.group(0).split(' ')[-1])
             logging.debug('Solution Number found - Crossword Number %d' %(solNumber))
         self.solutionNumber = solNumber
+
+
         if (self.puzzleNumber != 0) and (self.solutionNumber==0):
             self.solutionNumber = self.puzzleNumber - 1
             logging.debug ('Solution Number not found, guessing it based on puzzle number, solution number %d' % self.solutionNumber)
 
         logging.debug('Searching for Images')
         crosswordPageImages= getImageURLs(pageHtml)
-        if len(crosswordPageImages) > 2:
-            self.pageImages = [ x for x in crosswordPageImages if x not in pageImages]
-        else:
-            self.pageImages=crosswordPageImages
+        self.pageImages = [ x for x in crosswordPageImages if x not in pageImages]
+        self.pageImages.extend([ x for x in solImages if x not in pageImages])
         logging.debug('Images found on the page are %s' %('\n'.join (self.pageImages)))
         self.rawClues= getCluesFromHTML(pageHtml)
         logging.debug('Clue search completed!')
@@ -218,7 +230,7 @@ class ArtifactScraper(object):
     
 
 if __name__ == '__main__':
-    excludedDatesList=['2015-06-14', '2015-04-12', '2015-01-16', 
+    excludedDatesList=['2015-07-12','2015-06-14', '2015-04-12', '2015-01-16', 
                        '2014-11-17', '2014-10-23', '2014-10-04',
                        '2014-10-03', '2014-09-30', '2014-06-18',
                        '2014-06-17', '2014-03-30', '2014-02-09',
@@ -243,7 +255,7 @@ if __name__ == '__main__':
     logger = logging.getLogger()
     logger.addHandler(hdlr) 
 #     startDate = date.today()
-    startDate = date(2012,07,16)
+    startDate = date(2010, 6, 3)
     filename = os.path.abspath(os.path.join(__file__, '..', 'puzzles', 'pageData.yaml'))
     try:
         yamlDict = loadYamlFile(filename)
@@ -252,13 +264,25 @@ if __name__ == '__main__':
     finally:
         if yamlDict == None:
             yamlDict = {}
+#     yamlDict={}
 #     yamlDict = OrderedDict(sorted(yamlDict.items(), key=lambda x:x[1], reverse=True))
 #     print startDate
-    for day in (startDate - timedelta(n) for n in range(10000)):
-        if (str(day) not in yamlDict.keys()) and (str(day) not in excludedDatesList):
+    for day in (startDate - timedelta(n) for n in range(4000)):
+        processXword = False
+        if (str(day) in excludedDatesList):
+            continue
+        elif (str(day) in yamlDict.keys()):
+            if len(yamlDict[str(day)]['Images']) != 0:
+                continue
+            else:
+                processXword = True
+        else:
+            processXword = True
+
+        if processXword:
             try:
                 starttime = datetime.now()
-                
+                 
                 I = ArtifactScraper(day)
                 print I
                 yamlDict.update(I.getYamlDict())
