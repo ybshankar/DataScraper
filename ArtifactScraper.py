@@ -73,21 +73,22 @@ def getCrosswordURL(pageURL, htmlStr):
     if xWordURL is not None:
         xWordURL = xWordURL.group(0).split('"')[-2]
         if not xWordURL.startswith('http'):
-            xWordURLList.append(xWordURL)
-            xWordURL='/'.join(xWordURLList)
+            xWordURL = xWordURLList + [xWordURL]
+            xWordURL='/'.join(xWordURL)
         logging.debug('Puzzle Pattern found: %s' %(xWordURL))
 
         
     if oldXWordSolURL is not None:
-        logging.debug('Puzzle Pattern found: %s' %(xWordURL))
-        oldXWordSolURL=oldXWordSolURL.group(0).split('"')[1]
-        if not oldXWordSolURL.startswith('http'):
-            xWordURLList.append(oldXWordSolURL)
-            solnURL='/'.join(xWordURLList)
-        else:
-            solnURL = oldXWordSolURL
+        solnURL=oldXWordSolURL.group(0).lower().split('href="')[1].split('"')[0]
     elif newXWordSolURL is not None:
-        solnURL=newXWordSolURL.group(0).split('"')[1]
+        solnURL=newXWordSolURL.group(0).lower().split('href="')[1].split('"')[0]
+        
+    if solnURL is not None:
+        if not solnURL.startswith('http'):
+            solnURL = xWordURLList + [solnURL]
+            solnURL='/'.join(solnURL)
+        else:
+            solnURL = solnURL
 
     logging.debug('Solution Pattern found: %s' %(solnURL))
     return xWordURL, solnURL
@@ -109,7 +110,11 @@ def getImageURLs(htmlString):
     imgPatterns = re.finditer(r'<img src="http://www.thehindu.com/multimedia/dynamic/.*?.jpg\s?".*?"/>', splitString, flags=re.IGNORECASE)
     images = []
     for img in imgPatterns:
-        images.append(img.group(0).split('"')[1])
+        images.append(img.group(0).lower().split('href="')[1].split('"')[0])
+    
+    imgPatterns = re.finditer(r'<img src="../images/.*?.jpg\s?".*?>', splitString, flags=re.IGNORECASE)
+    for img in imgPatterns:
+        images.append(img.group(0).lower().split('src="')[1].split('"')[0])
     return images
 
 def getCluesFromHTML(htmlString):
@@ -118,6 +123,22 @@ def getCluesFromHTML(htmlString):
 
     clues = re.findall(r'<p class="body">.*?</p>', puzzleHTML)
     clues = [x[16:-4].replace('<b>', '').replace('</b>','') for x in clues]
+    
+    if len(clues) == 0:
+        newPuzzleHTML = re.search(r'<!-- story begins -->.*?<!-- story ends -->', puzzleHTML, flags=re.IGNORECASE)
+        clues = re.search(r'<PRE>.*?</PRE>', newPuzzleHTML.group(0), flags=re.IGNORECASE)
+        if clues is not None:
+            if '>Across' in clues.group(0):
+                clues = clues.group(0).split('Across')[1].split('Down')
+                
+                clues = ['Across'] + [ x.strip() +')' for x in clues[0].split(')') if not (x.strip().startswith('<') or len(x.strip())==0)] + ['Down'] + [ x.strip() +')' for x in clues[1].split(')') if not (x.strip().startswith('<')  or len(x.strip())==0)]
+        else:
+            cluesList = re.sub('<[^>]*>', '\n', newPuzzleHTML.group(0)).split('\n')
+            
+            clues = [x.strip() for x in cluesList if len(x.strip()) !=0]
+            if 'Across' in clues:
+                idx = clues.index('Across')
+                clues = clues[idx:]
     
     return  clues
 
@@ -166,11 +187,18 @@ class ArtifactScraper(object):
         self.puzzleNumber = number
         solHtml=''
         if not self.solnURL:
-            solHTML = pageHtml
+            solHtml = pageHtml
             solImages = []
         else:
             solHtml = getResponseString(self.solnURL)
             solImages = getImageURLs(solHtml)
+            for idx, img in enumerate(solImages):
+                if not img.startswith('http'):
+                    solURLPrefix = self.solnURL.split('/')[:-1]
+                    solImgURL = solURLPrefix + [img]
+                    solImages[idx] =  '/'.join(solImgURL)
+                    
+            
             
         solNumPattern = re.search(r'Solution\s?to\s?puzzle.*?[0-9]{2,5}', solHtml)
         if solNumPattern is not None:
@@ -185,8 +213,14 @@ class ArtifactScraper(object):
 
         logging.debug('Searching for Images')
         crosswordPageImages= getImageURLs(pageHtml)
+        for idx, img in enumerate(crosswordPageImages):
+            if not img.startswith('http'):
+                pageURLPrefix = self.pageURL.split('/')[:-1]
+                pageImgURL = pageURLPrefix + [img]
+                crosswordPageImages[idx] =  '/'.join(pageImgURL)
         self.pageImages = [ x for x in crosswordPageImages if x not in pageImages]
         self.pageImages.extend([ x for x in solImages if x not in pageImages])
+            
         logging.debug('Images found on the page are %s' %('\n'.join (self.pageImages)))
         self.rawClues= getCluesFromHTML(pageHtml)
         logging.debug('Clue search completed!')
@@ -255,7 +289,7 @@ if __name__ == '__main__':
     logger = logging.getLogger()
     logger.addHandler(hdlr) 
 #     startDate = date.today()
-    startDate = date(2010, 6, 3)
+    startDate = date(2002,10,17)
     filename = os.path.abspath(os.path.join(__file__, '..', 'puzzles', 'pageData.yaml'))
     try:
         yamlDict = loadYamlFile(filename)
@@ -286,7 +320,8 @@ if __name__ == '__main__':
                 I = ArtifactScraper(day)
                 print I
                 yamlDict.update(I.getYamlDict())
-                writeYamlDocToFile(yamlDict, filename)
+                
+
             except Exception as e:
                 logging.exception(e)
                 pass
@@ -294,7 +329,11 @@ if __name__ == '__main__':
                 print
                 print "Time Taken : " + str(datetime.now() - starttime)
                 print
-#          
+        # write the yamldict every 30 days
+        if (startDate - day).days % 60 == 0:
+            writeYamlDocToFile(yamlDict, filename)
+    writeYamlDocToFile(yamlDict, filename)
+#    
 #     startDate = date.today()
 #     #startDate = date(2013,11,23)
 #     for day in (startDate - timedelta(n) for n in range(100)):
